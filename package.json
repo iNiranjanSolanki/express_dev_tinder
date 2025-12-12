@@ -1,0 +1,30 @@
+{
+  "name": "devtinder_be",
+  "version": "1.0.0",
+  "description": "NodeJS , devtinder , be , express mongodb",
+  "main": "index.js",
+  "scripts": {
+   "start": "node src/app.js",
+   "dev": "nodemon src/app.js"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/iNiranjanSolanki/express_dev_tinder.git"
+  },
+  "keywords": [
+    "Node",
+    "js",
+    "devtinder",
+    "express",
+    "mongodb"
+  ],
+  "author": "Niranjan Solanki",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/iNiranjanSolanki/express_dev_tinder/issues"
+  },
+  "homepage": "https://github.com/iNiranjanSolanki/express_dev_tinder#readme",
+  "dependencies": {
+    "express": "^5.2.1"
+  }
+}
