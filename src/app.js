@@ -1,8 +1,11 @@
 const express = require('express');
 const app = express();
+const cookieParser = require('cookie-parser');
 const {connectDB} =require("./config/db");
 const User = require('./models/user');
 const port = 7000;      
+app.use(express.json());
+app.use(cookieParser());
 app.post("/signup", async (req, res) => {
         const userObj = {
                 username: "onlyVishesh",

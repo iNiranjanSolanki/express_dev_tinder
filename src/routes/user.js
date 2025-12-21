@@ -1,0 +1,148 @@
+const express = require("express");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
+const sendEmail = equire('./sendmail');
+const router = express.Router();
+
+app.post("/signup", async (req, res) => {
+        try {
+                validateSignUpData(req);
+                const { username, firstName, lastName, email, password } = req.body;
+
+                const passwordHash = await bcrypt.hash(password, 10);
+
+                const user = new User({
+                        username,
+                        firstName,
+                        lastName,
+                        email,
+                        password: passwordHash,
+                });
+                await user.save();
+                res.status(200).send("User Added successfully");
+        } catch (err) {
+                res.status(500).json({ error: err.message });
+        }
+});
+app.post("/login", async (req, res) => {
+        try {
+                validateLoginData(req)
+                const { username, email, password } = req.body;
+                const userId = email || username;
+
+
+                const user = await User.findOne({
+                        $or: [{ email: userId }, { username: userId }],
+                });
+
+                if (!user) {
+                        return res
+                                .status(400)
+                                .json({ error: "Invalid Credential" });
+                }
+                const isPasswordValid = await bcrypt.compare(password, user.password)
+
+                if (isPasswordValid) {
+                        res.status(200).send("login successful")
+                } else {
+                        throw new Error("Invalid Credential");
+                }
+        } catch (err) {
+                res.status(500).json({ error: err.message });
+        }
+});
+app.patch("/user", async (req, res) => {
+        try {
+                const { email, username } = req.body;
+                const userId = email || username;
+
+                const ALLOWED_UPDATE = [
+                        "username",
+                        "firstName",
+                        "lastName",
+                        "password",
+                        "avatar",
+                        "about",
+                        "skills",
+                        "dateOfBirth",
+                        "gender",
+                        "role",
+                        "status",
+                ];
+                const data = req.body;
+
+                const isUpdateAllowed = Object.keys(data).every((k) =>
+                        ALLOWED_UPDATE.includes(k)
+                );
+
+                if (!isUpdateAllowed) {
+                        throw new Error("Update not allow");
+                }
+
+                if (!userId) {
+                        return res
+                                .status(404)
+                                .json({ error: "Email or username must be provided" });
+                }
+
+                const user = await User.findOneAndUpdate(
+                        {
+                                $or: [{ username: userId }, { email: userId }],
+                        },
+                        data,
+                        { runValidators: true }
+                );
+
+                if (!user) {
+                        return res.status(404).send({ error: "User not found" });
+                }
+                res.status(200).json({
+                        updatedUser: `User with username : ${user.username} and email : ${user.email} has been Updated`,
+                });
+        } catch (err) {
+                console.error(err);
+                res.status(500).json({ error: "Something went wrong " + err.message });
+        }
+});
+app.get("/feed", async (req, res) => {
+        try {
+                const users = await User.find();
+
+                if (users.length === 0) {
+                        return res.status(404).json({ error: "User no user exist" });
+                }
+                res.status(200).json(users);
+        } catch (err) {
+                console.error(err);
+                res.status(500).json({ error: "Something went wrong " + err.message });
+        }
+});
+
+app.delete("/user", async (req, res) => {
+        try {
+                const { email, username } = req.body;
+                const userId = email || username;
+
+                if (!userId) {
+                        return res
+                                .status(404)
+                                .json({ error: "Email or username must be provided" });
+                }
+
+                const user = await User.findOneAndDelete({
+                        $or: [{ username: userId }, { email: userId }],
+                });
+
+                if (!user) {
+                        return res.status(404).send({ error: "User not found" });
+                }
+
+                res.status(200).json({
+                        deletedUser: `User with username : ${user.username} and email : ${user.email} has been deleted`,
+                });
+        } catch (err) {
+                console.error(err);
+                res.status(500).json({ error: "Something went wrong " + err.message });
+        }
+});
+module.exports = router;
