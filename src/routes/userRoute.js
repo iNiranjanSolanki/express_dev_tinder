@@ -2,7 +2,7 @@ const express = require("express");
 const bcrypt = require("bcryptjs");
 const router = express.Router();
 
-app.post("/signup", async (req, res) => {
+router.post("/signup", async (req, res) => {
         try {
                 validateSignUpData(req);
                 const { username, firstName, lastName, email, password } = req.body;
@@ -22,7 +22,7 @@ app.post("/signup", async (req, res) => {
                 res.status(500).json({ error: err.message });
         }
 });
-app.post("/login", async (req, res) => {
+router.post("/login", async (req, res) => {
         try {
                 validateLoginData(req)
                 const { username, email, password } = req.body;
@@ -49,7 +49,7 @@ app.post("/login", async (req, res) => {
                 res.status(500).json({ error: err.message });
         }
 });
-app.patch("/user", async (req, res) => {
+router.patch("/user", async (req, res) => {
         try {
                 const { email, username } = req.body;
                 const userId = email || username;
@@ -102,7 +102,7 @@ app.patch("/user", async (req, res) => {
                 res.status(500).json({ error: "Something went wrong " + err.message });
         }
 });
-app.get("/feed", async (req, res) => {
+router.get("/feed", async (req, res) => {
         try {
                 const users = await User.find();
 
@@ -116,7 +116,7 @@ app.get("/feed", async (req, res) => {
         }
 });
 
-app.delete("/user", async (req, res) => {
+router.delete("/user", async (req, res) => {
         try {
                 const { email, username } = req.body;
                 const userId = email || username;
