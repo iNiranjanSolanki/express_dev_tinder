@@ -1,7 +1,5 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const bcrypt = require("bcryptjs");
-const sendEmail = equire('./sendmail');
 const router = express.Router();
 
 app.post("/signup", async (req, res) => {
