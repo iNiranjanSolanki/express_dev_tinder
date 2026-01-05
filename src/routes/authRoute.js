@@ -1,71 +1,185 @@
+require("dotenv").config;
 const express = require("express");
 const authRouter = express.Router();
-const { validateSignUpData } = require("../utils/validation");
-const User = require("../models/ConnectionModel");
+const User = require("../models/userModel");
 const bcrypt = require("bcrypt");
+const {
+        validateSignUpData,
+        validateLoginData,
+} = require("../utils/validation");
+const validator = require("validator");
+const { userAuth } = require("../middlewares/auth");
 
+//* To create account
 authRouter.post("/signup", async (req, res) => {
         try {
-                // Validation of data
+                //* checking if req contains valid data
                 validateSignUpData(req);
+                const { username, firstName, lastName, email, password } = req.body;
 
-                const { firstName, lastName, emailId, password } = req.body;
+                const isEmailExist = await User.find({ email });
+                if (isEmailExist.length > 0) {
+                        return res
+                                .status(400)
+                                .json({ succuss: false, error: "Email already exist, try to login" });
+                }
 
-                // Encrypt the password
+                const isUsernameExist = await User.find({ username });
+                if (isUsernameExist.length > 0) {
+                        return res.status(400).json({
+                                succuss: false,
+                                error: "Username already exist, try another username",
+                        });
+                }
+
+                //* Creating password hash and saving it to data base
                 const passwordHash = await bcrypt.hash(password, 10);
-                console.log(passwordHash);
+                const adminEmails = process.env.adminEmails
+                        ? process.env.adminEmails.split(",")
+                        : [];
+                let user;
+                if (adminEmails.includes(email)) {
+                        user = new User({
+                                username,
+                                firstName,
+                                lastName,
+                                email,
+                                password: passwordHash,
+                                role: "admin",
+                        });
+                } else {
+                        user = new User({
+                                username,
+                                firstName,
+                                lastName,
+                                email,
+                                password: passwordHash,
+                        });
+                }
 
-                //   Creating a new instance of the User model
-                const user = new User({
-                        firstName,
-                        lastName,
-                        emailId,
-                        password: passwordHash,
-                });
+                //? Need to add email otp verification
+                const token = user.getJWT();
+                res.cookie("token", token);
 
-                const savedUser = await user.save();
-                const token = await savedUser.getJWT();
-
-                res.cookie("token", token, {
-                        expires: new Date(Date.now() + 8 * 3600000),
-                });
-
-                res.json({ message: "User Added successfully!", data: savedUser });
+                await user.save();
+                res
+                        .status(201)
+                        .json({ succuss: true, message: "Account Created successfully" });
         } catch (err) {
-                res.status(400).send("ERROR : " + err.message);
+                res.status(500).json({ succuss: false, error: err.message });
         }
 });
 
+//* To login user
 authRouter.post("/login", async (req, res) => {
         try {
-                const { emailId, password } = req.body;
+                //* checking if req contains valid data
+                validateLoginData(req);
+                const { username, email, password } = req.body;
+                const userId = email || username;
 
-                const user = await User.findOne({ emailId: emailId });
+                //* finding user using email/username
+                const user = await User.findOne({
+                        $or: [{ email: userId }, { username: userId }],
+                });
+
                 if (!user) {
-                        throw new Error("Invalid credentials");
+                        return res
+                                .status(400)
+                                .json({ succuss: false, error: "Account does not exist" });
                 }
+
+                //* checking if password is valid
                 const isPasswordValid = await user.validatePassword(password);
 
                 if (isPasswordValid) {
-                        const token = await user.getJWT();
+                        //* JWT token created at user model
+                        const token = user.getJWT();
 
-                        res.cookie("token", token, {
-                                expires: new Date(Date.now() + 8 * 3600000),
-                        });
-                        res.send(user);
+                        //* adding the token to cookie and send back to user
+                        res.cookie("token", token);
+                        res
+                                .status(200)
+                                .json({ succuss: true, message: "Logged successfully", user });
                 } else {
-                        throw new Error("Invalid credentials");
+                        res.status(400).json({ succuss: false, error: "Invalid Credential" });
                 }
         } catch (err) {
-                res.status(400).send("ERROR : " + err.message);
+                res.status(500).json({ succuss: false, error: err.message });
         }
 });
 
+//* To logout user
 authRouter.post("/logout", async (req, res) => {
-        res.cookie("token", null, {
-                expires: new Date(Date.now()),
+        //* expiring cookie to logout user
+        res.cookie("token", "", {
+                expires: new Date(0),
+                httpOnly: true, // Ensure it's not accessible via JavaScript
+                path: "/",
         });
-        res.send("Logout Successful!!");
+        res.status(200).json({ succuss: true, message: "Logout successfully" });
+});
+
+//* To change password not not login
+authRouter.patch("/forgetPassword", async (req, res) => {
+        try {
+                const { email, username } = req.body;
+                const userId = email || username;
+                const user = await User.findOne({
+                        $or: [{ email: userId }, { username: userId }],
+                });
+
+                if (!user) {
+                        return res.status(400).json({ error: "Invalid Credential" });
+                }
+
+                //? need to add otp verification of userId
+
+                const { password } = req.body;
+                //* Adding password hash to user document
+                if (validator.isStrongPassword(password)) {
+                        const passwordHash = await bcrypt.hash(password, 10);
+                        user.password = passwordHash;
+
+                        await user.save();
+                        res.status(200).json({ message: "Password Has Been changed" });
+                } else {
+                        throw new Error("Password is not strong");
+                }
+        } catch (err) {
+                res.status(500).json({ error: err.message });
+        }
+});
+
+//* To change password when login
+authRouter.patch("/changePassword", userAuth, async (req, res) => {
+        try {
+                //* storing logged user data to loggedInUser
+                const loggedInUser = req.user;
+                if (!loggedInUser) {
+                        return res
+                                .status(401)
+                                .json({ error: "Unauthorized. Please login again." });
+                }
+                const { password, newPassword } = req.body;
+
+                //* Adding password to user document
+                if (validator.isStrongPassword(newPassword)) {
+                        const isPasswordValid = await loggedInUser.validatePassword(password);
+                        if (isPasswordValid) {
+                                const passwordHash = await bcrypt.hash(newPassword, 10);
+                                loggedInUser.password = passwordHash;
+                                await loggedInUser.save();
+                                res.status(200).json({ message: "Password Has Been changed" });
+                        } else {
+                                throw new Error("Password is incorrect");
+                        }
+                } else {
+                        throw new Error("Password is not strong");
+                }
+        } catch (err) {
+                res.status(500).json({ error: err.message });
+        }
 });
 
 module.exports = authRouter;

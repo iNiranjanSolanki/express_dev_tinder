@@ -1,45 +1,47 @@
 const mongoose = require("mongoose");
+const { Schema } = mongoose;
 
-const connectionRequestSchema = new mongoose.Schema(
+const connectionRequestSchema = new Schema(
         {
                 fromUserId: {
                         type: mongoose.Schema.Types.ObjectId,
-                        ref: "User",
                         required: true,
+                        ref: "User"
                 },
                 toUserId: {
                         type: mongoose.Schema.Types.ObjectId,
-                        ref: "User",
                         required: true,
+                        ref: "User"
                 },
                 status: {
                         type: String,
-                        required: true,
                         enum: {
-                                values: ["ignored", "interested", "accepted", "rejected"],
+                                values: ["pending", "ignored", "interested", "accepted", "rejected"],
                                 message: `{VALUE} is incorrect status type`,
                         },
+                        required: true,
                 },
         },
         { timestamps: true }
 );
 
-// ConnectionRequest.find({fromUserId: 273478465864786587, toUserId: 273478465864786587})
-
+//* Creating composite index
 connectionRequestSchema.index({ fromUserId: 1, toUserId: 1 });
 
+//* creating pre save function to check if form and to user is same during saving
 connectionRequestSchema.pre("save", function (next) {
-        const connectionRequest = this;
-        // Check if the fromUserId is same as toUserId
-        if (connectionRequest.fromUserId.equals(connectionRequest.toUserId)) {
-                throw new Error("Cannot send connection request to yourself!");
+        // checking if fromUserId is same as toUserId
+
+        if (this.fromUserId.equals(this.toUserId)) {
+                throw new Error("You Could not send request to yourself");
         }
+
         next();
 });
 
-const ConnectionRequestModel = new mongoose.model(
+const ConnectionRequest = new mongoose.model(
         "ConnectionRequest",
         connectionRequestSchema
 );
 
-module.exports = ConnectionRequestModel;
+module.exports = ConnectionRequest;
